@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import matplotlib.animation as animation
 import scipy.stats as sps
 
 r_x = list()
 r_y = list()
 n_radius = 50
-rough_n = 1000
+rough_n = 50000
 
 max_radius = 25e19
 
@@ -19,7 +20,7 @@ for i in range(n_radius):
     circumference = circumferences[i]
     radius = radii[i]
     # j_tot = int(np.floor(total_circumference / rough_n * circumference))
-    j_tot = int(np.floor(rough_n / n_radius * (np.random.random() + 0.5)))
+    j_tot = int(np.floor(rough_n / (n_radius**2) * (np.random.random() + 0.5)))
     for j in range(j_tot):
         phi = np.random.random() * 2 * np.pi
         r_x.append(np.cos(phi) * radius)
@@ -28,10 +29,10 @@ for i in range(n_radius):
 n = len(r_x)
 r_x = np.array(r_x)
 r_y = np.array(r_y)
-r_d_x = np.zeros(n)
-r_d_y = np.zeros(n)
-r_dd_x = np.zeros(n)
-r_dd_y = np.zeros(n)
+rd_x = np.zeros(n)
+rd_y = np.zeros(n)
+rdd_x = np.zeros(n)
+rdd_y = np.zeros(n)
 m = np.random.gamma(shape=0.7, scale=0.47, size=n) + 0.05
 
 cells = list()
@@ -148,7 +149,8 @@ class Cell:
             return 0, 0
 
     def draw(self):
-        ax.add_patch(Rectangle((self.x, self.y - self.size), self.size, self.size, fill=None))
+        # ax.add_patch(Rectangle((self.x, self.y - self.size), self.size, self.size, fill=None))
+        pass
 
 
 G = 6.67408e-11
@@ -157,43 +159,84 @@ dt = 31e12
 
 # fig = plt.figure()
 # ax = fig.add_subplot(1, 1, 1)
-for t in np.arange(0, dt * 10000, dt):
-    print(t)
 
-    cells = list()
-    # plt.plot(r_x, r_y, ls='', marker='.')
-    quad_tree = Cell(-max_radius, max_radius, 2 * max_radius)
+quad_tree = Cell(-max_radius * 5, max_radius * 5, 10 * max_radius)
 
-    for i in range(n):
-        quad_tree.insert(r_x[i], r_y[i], m[i])
+for i in range(n):
+    quad_tree.insert(r_x[i], r_y[i], m[i])
 
-    # for cell in cells:
-    #    cell.draw()
+quad_tree.compute_mass()
 
-    for i in range(n):
-        r_x_i = r_x[i]
-        r_y_i = r_y[i]
-        l_i_factor = ((2 * np.random.random() + 1) * 1e5) / np.sqrt(r_x_i ** 2 + r_y_i ** 2)
-        r_d_x[i] = r_y_i * l_i_factor
-        r_d_y[i] = -r_x_i * l_i_factor
+for i in range(n):
+    r_x_i_0 = r_x[i]
+    r_y_i_0 = r_y[i]
+    l_i_factor = ((2 * np.random.random() + 1) * 1e5) / np.sqrt(r_x_i_0 ** 2 + r_y_i_0 ** 2) * 0.1
+    rd_x_i_0 = r_y_i_0 * l_i_factor
+    rd_y_i_0 = -r_x_i_0 * l_i_factor
+    mdt_x_i_0, mdt_y_i_0 = quad_tree.get_mass_distance_term(r_x_i_0, r_y_i_0)
+    rdd_x_i_0 = -G * m_sol * mdt_x_i_0
+    rdd_y_i_0 = -G * m_sol * mdt_y_i_0
+    r_x_i_1 = r_x_i_0 + rd_x_i_0 * dt + 0.5 * rdd_x_i_0 * dt ** 2
+    r_y_i_1 = r_y_i_0 + rd_x_i_0 * dt + 0.5 * rdd_y_i_0 * dt ** 2
+    r_x[i] = r_x_i_1
+    r_y[i] = r_y_i_1
+    rd_x[i] = rd_x_i_0
+    rd_y[i] = rd_y_i_0
+    rdd_x[i] = rdd_x_i_0
+    rdd_y[i] = rdd_y_i_0
 
-    quad_tree.compute_mass()
 
-    for i in range(n):
-        md_x_i, md_y_i = quad_tree.get_mass_distance_term(r_x[i], r_y[i])
-        r_dd_x_i = G * m_sol * md_x_i
-        r_dd_x[i] = r_dd_x_i * dt
-        r_d_x[i] += r_dd_x_i
-        r_dd_y_i = G * m_sol * md_y_i
-        r_d_y[i] += r_dd_y_i * dt
-        r_dd_y[i] = r_dd_y_i
-        r_x[i] += r_d_x[i] * dt
-        r_y[i] += r_d_y[i] * dt
+# Notice that r is 1 ahead of rd and rdd
 
-    np.savetxt('model_x.txt', r_x)
-    np.savetxt('model_y.txt', r_y)
 
-    # ax.set_aspect('equal')
-    # plt.show()
+def model_loop(queue):
+    for j, t in enumerate(np.arange(0, dt * 10000, dt), 1):
+        print(t)
 
-print()
+        cells = list()
+        # plt.plot(r_x, r_y, ls='', marker='.')
+        quad_tree = Cell(-max_radius * 10, max_radius * 10, 20 * max_radius)
+
+        for i in range(n):
+            quad_tree.insert(r_x[i], r_y[i], m[i])
+
+        # for cell in cells:
+        #    cell.draw()
+
+        quad_tree.compute_mass()
+
+        for i in range(n):
+            r_x_i_j = r_x[i]
+            r_y_i_j = r_y[i]
+            rd_x_i_jm1 = rd_x[i]
+            rd_y_i_jm1 = rd_y[i]
+            rdd_x_i_jm1 = rdd_x[i]
+            rdd_y_i_jm1 = rdd_y[i]
+
+            # calculate rdd_i_j
+            md_x_i_j, md_y_i_j = quad_tree.get_mass_distance_term(r_x_i_j, r_y_i_j)
+            rdd_x_i_j = -G * m_sol * md_x_i_j
+            rdd_y_i_j = -G * m_sol * md_y_i_j
+
+            # calculate rd_i_j
+            rd_x_i_j = rd_x_i_jm1 + 0.5 * (rdd_x_i_jm1 + rdd_x_i_j) * dt
+            rd_y_i_j = rd_y_i_jm1 + 0.5 * (rdd_y_i_jm1 + rdd_y_i_j) * dt
+
+            # calculate r_i_(j+1)
+            r_x_i_jp1 = r_x_i_j + rd_x_i_j * dt + 0.5 * rdd_x_i_j * dt ** 2
+            r_y_i_jp1 = r_y_i_j + rd_y_i_j * dt + 0.5 * rdd_y_i_j * dt ** 2
+
+            r_x[i] = r_x_i_jp1
+            r_y[i] = r_y_i_jp1
+            rd_x[i] = rd_x_i_j
+            rd_y[i] = rd_y_i_j
+            rdd_x[i] = rdd_x_i_j
+            rdd_y[i] = rdd_y_i_j
+
+        # np.savetxt('model_x.txt', r_x)
+        # np.savetxt('model_y.txt', r_y)
+
+        queue.put((r_x, r_y))
+
+        # ax.set_aspect('equal')
+        # plt.show()
