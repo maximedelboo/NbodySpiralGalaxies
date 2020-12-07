@@ -203,7 +203,7 @@ def model_loop(queue):
     #dark matter halo
     alpha = 1.5
     m_sol = 1.98847e30
-    f= 0.2
+    f= 0.000001
     M_d = m_sol*sum(m)
     M_h = M_d/f - M_d
     R = max_radius
@@ -240,8 +240,8 @@ def model_loop(queue):
             
 
             
-            a_x = (r_x_i_j/r)*G*M(r, alpha, r_0, rho_0)/r**2
-            a_y = (r_y_i_j/r)*G*M(r, alpha, r_0, rho_0)/r**2
+            a_x = -(r_x_i_j/r)*G*M(r, alpha, r_0, rho_0)/(r**2)
+            a_y = -(r_y_i_j/r)*G*M(r, alpha, r_0, rho_0)/(r**2)
 
             # calculate rdd_i_j
             md_x_i_j, md_y_i_j = quad_tree.get_mass_distance_term(r_x_i_j, r_y_i_j)
