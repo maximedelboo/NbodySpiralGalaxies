@@ -39,6 +39,16 @@ cells = list()
 theta = 0.98
 
 
+
+def M(r, alpha, r_0, rho_0):
+
+    return 2*np.pi*rho_0*(r_0**alpha)*(r**(2-alpha))/(2-alpha)
+
+#hoeksnelheid door darkmatter halo
+def dphi(r, alpha, r_0, omega_0):
+    
+    return omega_0*((r/r_0)**(-alpha/2))
+
 class Cell:
     def __init__(self, top_left_x, top_left_y, size, parent=None):
         self.x = top_left_x
@@ -190,6 +200,19 @@ for i in range(n):
 
 
 def model_loop(queue):
+    #dark matter halo
+    alpha = 1.5
+    m_sol = 1.98847e30
+    f= 0.2
+    M_d = m_sol*sum(m)
+    M_h = M_d/f - M_d
+    R = max_radius
+    r_0 = max_radius
+    rho_0 = (2-alpha)*M_h/(2*np.pi*(r_0**alpha)*(R**(2-alpha)))
+    
+    G = 6.67408e-11
+    omega_0 = np.sqrt(2*np.pi*G*rho_0/(2-alpha))
+    
     for j, t in enumerate(np.arange(0, dt * 10000, dt), 1):
         print(t)
 
@@ -212,11 +235,18 @@ def model_loop(queue):
             rd_y_i_jm1 = rd_y[i]
             rdd_x_i_jm1 = rdd_x[i]
             rdd_y_i_jm1 = rdd_y[i]
+            
+            r = np.sqrt(r_x_i_j**2 + r_y_i_j**2)
+            
+
+            
+            a_x = (r_x_i_j/r)*G*M(r, alpha, r_0, rho_0)/r**2
+            a_y = (r_y_i_j/r)*G*M(r, alpha, r_0, rho_0)/r**2
 
             # calculate rdd_i_j
             md_x_i_j, md_y_i_j = quad_tree.get_mass_distance_term(r_x_i_j, r_y_i_j)
-            rdd_x_i_j = -G * m_sol * md_x_i_j
-            rdd_y_i_j = -G * m_sol * md_y_i_j
+            rdd_x_i_j = -G * m_sol * md_x_i_j + a_x
+            rdd_y_i_j = -G * m_sol * md_y_i_j + a_y
 
             # calculate rd_i_j
             rd_x_i_j = rd_x_i_jm1 + 0.5 * (rdd_x_i_jm1 + rdd_x_i_j) * dt
