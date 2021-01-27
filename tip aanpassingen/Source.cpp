@@ -6,8 +6,14 @@
 using namespace std;
 
 void Model::init() {
-	for (int h = 501; h < n + 501; h++) {
-		radii.push_back(h * (radius_gal / n));
+	double h_factor_start = 0.7 / 3;
+	double h_factor_end = 2.9 / 3;
+
+	double disk_distance = (h_factor_end - h_factor_start) * radius_gal;
+	double dr_per_rad = disk_distance / n;
+
+    for (int i = 0; i < n; i++) {
+		radii.push_back(i * dr_per_rad + (radius_gal * h_factor_start));
 	}
 
 	r_x.clear();
@@ -57,13 +63,13 @@ void Model::init() {
 	for (int i = 0; i < n; i++) {
 		double r_x_i_0 = r_x[i];
 		double r_y_i_0 = r_y[i];
-		double l_i_factor = sqrt(Gvar * m_sol * 1e3 / radii[i]) * 0;
+		double l_i_factor = sqrt(Gvar * m_sol * m_center_mass / radii[i]);
 		double rd_x_i_0 = -sin(phi[i]) * l_i_factor;
 		double rd_y_i_0 = cos(phi[i]) * l_i_factor;
 		double mdt_x_i_0, mdt_y_i_0;
 		tie(mdt_x_i_0, mdt_y_i_0) = quad_tree.get_mass_distance_term(r_x_i_0, r_y_i_0);
-		double rdd_x_i_0 = -Gvar * m_sol * mdt_x_i_0;
-		double rdd_y_i_0 = -Gvar * m_sol * mdt_y_i_0;
+		double rdd_x_i_0 = Gvar * m_sol * mdt_x_i_0;
+		double rdd_y_i_0 = Gvar * m_sol * mdt_y_i_0;
 		double r_x_i_1 = r_x_i_0 + rd_x_i_0 * dt + 0.5 * rdd_x_i_0 * pow(dt, 2);
 		double r_y_i_1 = r_y_i_0 + rd_y_i_0 * dt + 0.5 * rdd_y_i_0 * pow(dt, 2);
 		r_x[i] = r_x_i_1;
@@ -93,7 +99,6 @@ void Model::init() {
 	r_0 = radius_gal;
 	rho_0 = (2 - alpha) * M_h / (2 * PI * pow(r_0, alpha) * pow(R, (2 - alpha)));
 
-	Gvar = 6.67408e-11;
 	omega_0 = sqrt(2 * PI * Gvar * rho_0 / (2 - alpha));
 
 }
@@ -128,7 +133,9 @@ void Model::model_loop() {
 	vector<double> r_y_i_jp1(n, 0.0);
 	vector<double> rdd_x_i_j(n, 0.0);
 	vector<double> rdd_y_i_j(n, 0.0);
-	
+    vector<double> center_d(n, 0.0);
+    vector<double> pert_d(n, 0.0);
+
 	/*
 	fill(mdi_j.begin(), mdi_j.end(), make_tuple(0.0,0.0));
 	fill(rr.begin(), rr.end(), 0.0);
@@ -139,19 +146,32 @@ void Model::model_loop() {
 	fill(rdd_x_i_j.begin(), rdd_x_i_j.end(), 0.0);
 	fill(rdd_y_i_j.begin(), rdd_y_i_j.end(), 0.0);
 	*/
-	
+
+    T = omega*t + PI/2;
+    vector<double> AX(n, 0.0);
+    vector<double> AY(n, 0.0);
 
 
 	#pragma omp parallel for
 	for (int i = 0; i < n; i++) {
 		
-		rr[i] = sqrt(pow(r_x[i], 2) + pow(r_y[i], 2));
+		rr[i] = sqrt(pow(r_x[i], 2) + pow(r_y[i], 2)) + epsilon;
 
 		//calculate rdd_i_j
-		mdi_j[i] = quad_tree.get_mass_distance_term(r_x[i], r_y[i]);
+		// mdi_j[i] = quad_tree.get_mass_distance_term(r_x[i], r_y[i]);
 
-		rdd_x_i_j[i] = -Gvar * m_sol * get<0>(mdi_j[i]);
-		rdd_y_i_j[i] = -Gvar * m_sol * get<1>(mdi_j[i]);
+        //calculate center mass
+        center_d[i] = sqrt(pow(0 - r_x[i], 2) + pow(0 - r_y[i], 2));
+        pert_d[i] = sqrt(pow(pert_distance - r_x[i], 2) + pow(-pert_distance - r_y[i], 2));
+
+        //potential
+        AX[i] = cte*(r_x[i]*(pow(r_x[i],2)-pow(r_y[i],2))*cos(T) + 2*r_y[i]*pow(r_x[i],2)*sin(T) - 4*pow(r_y[i],2)*r_x[i]*cos(T) + 2*r_y[i]*(pow(r_x[i],2)-pow(r_y[i],2))*sin(T)) / pow(rr[i], 5);
+        AY[i] = cte*(r_y[i]*(pow(r_x[i],2)-pow(r_y[i],2))*cos(T) + 2*r_x[i]*pow(r_y[i],2)*sin(T) - 4*pow(r_x[i],2)*r_y[i]*cos(T) + 2*r_x[i]*(pow(r_x[i],2)-pow(r_y[i],2))*sin(T)) / pow(rr[i], 5);
+
+		rdd_x_i_j[i] = Gvar * m_sol * (/*get<0>(mdi_j[i]) +*/ m_center_mass * (0 - r_x[i]) / pow(center_d[i], 3) /*+ 50 * (pert_distance - r_x[i]) / pow(pert_d[i], 3)*/) + AX[i];
+		rdd_y_i_j[i] = Gvar * m_sol * (/*get<1>(mdi_j[i]) +*/ m_center_mass * (0 - r_y[i]) / pow(center_d[i], 3) /*+ 50 * (-pert_distance - r_y[i]) / pow(pert_d[i], 3)*/) + AY[i];
+
+
 
 		//calculate rd_i_j
 		rd_x_i_j[i] = rd_x[i] + 0.5 * (rdd_x[i] + rdd_x_i_j[i]) * dt;
@@ -184,7 +204,7 @@ int main() {
 	
 	ofstream outFile;
 	outFile.open("./huts.csv");
-	int Iterations = 500;
+	int Iterations = 3000;
 	
 
 
@@ -200,7 +220,7 @@ int main() {
 			outFile << model.r_x[j] << ";" << model.r_y[j] << ";";
 		}
 		outFile << endl;
-
+        model.t = h*model.dt;
 		model.model_loop();
 		
 	}

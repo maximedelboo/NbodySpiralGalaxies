@@ -107,7 +107,7 @@ double Cell::compute_mass() {
 
 tuple<double, double> Cell::get_mass_distance_term(double probe_x, double probe_y) {
 	if (point_x) {
-		double d = sqrt(pow(point_x - probe_x, 2) + pow(point_y - probe_y, 2));
+		double d = sqrt(pow(point_x - probe_x, 2) + pow(point_y - probe_y, 2)) + 2e14;
 		if(d == 0){
 			return make_tuple(0, 0);
 		}
@@ -119,7 +119,7 @@ tuple<double, double> Cell::get_mass_distance_term(double probe_x, double probe_
 	}
 	else if (children[0]) {
 
-		double d = sqrt(pow(cm_x - probe_x,2) + pow(cm_y - probe_y,2));
+		double d = sqrt(pow(cm_x - probe_x,2) + pow(cm_y - probe_y,2)) + 2e14;
 		if (d == 0) {
 			return make_tuple(0, 0);
 		}

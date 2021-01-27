@@ -7,7 +7,7 @@
 #include <random>
 #include <tuple>
 
-#define THETA 0.5
+#define THETA 0.8
 
 using namespace std;
 class Cell {
