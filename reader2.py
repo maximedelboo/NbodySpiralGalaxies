@@ -10,7 +10,7 @@ rcParams['animation.ffmpeg_path'] = r'C:\Program Files\ffmpeg\bin\ffmpeg.exe'  #
 
 fig, ax = plt.subplots(figsize=(8, 8))
 
-filename = 'huts.csv'
+filename = 'C:/Users/tip/Files/Git projects/Planeten-enal/huts.csv'
 # path van de csv, best bij de python file
 dat = np.genfromtxt(filename, delimiter=';')
 dat = dat[:, :-1]
@@ -25,10 +25,12 @@ ax.set(xlim=(min(row1[0]) * rs, max(row1[0]) * rs), ylim=(min(row1[1]) * rs, max
 
 line = ax.plot(row1[0], row1[1], '.', ms=1)[0]
 
-line2 = ax.plot(row1[0][poii], row1[1][poii], '.', ms=10, c='red')[0]
-line3 = ax.plot(row1[0][poii2], row1[1][poii2], '.', ms=10, c='red')[0]
-line4 = ax.plot(row1[0][poii3], row1[1][poii3], '.', ms=10, c='red')[0]
-line5 = ax.plot(row1[0][poii4], row1[1][poii4], '.', ms=10, c='red')[0]
+ms_line = 10
+
+line2 = ax.plot(row1[0][poii], row1[1][poii], '.', ms=ms_line, c='red')[0]
+line3 = ax.plot(row1[0][poii2], row1[1][poii2], '.', ms=ms_line, c='red')[0]
+line4 = ax.plot(row1[0][poii3], row1[1][poii3], '.', ms=ms_line, c='red')[0]
+line5 = ax.plot(row1[0][poii4], row1[1][poii4], '.', ms=ms_line, c='red')[0]
 #line4 = ax.plot(row1[0][900], row1[1][900], '.', ms=10, c='red')[0]
 
 
@@ -49,7 +51,7 @@ def animate(i):
 
 
 anim = FuncAnimation(fig, animate, interval=10,
-                     frames=2000)  # je kan rondkloten met frames en interval voor de snelheid
+                     frames=5000)  # je kan rondkloten met frames en interval voor de snelheid
 plt.draw()
 plt.title(filename)
 plt.show()
