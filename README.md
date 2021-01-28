@@ -1,2 +1,2 @@
-# Planeten-enal
+# NbodySpiralGalaxies
 Project Modelling 2B
